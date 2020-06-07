@@ -6,7 +6,7 @@ from tests.TestingHelper import *
 
 @pytest.fixture
 def basic_node():
-  return Node(get_test_nodes())
+  return Node(get_test_nodes(), 1738)
 
 def test_promote_to_candidate(basic_node):
   basic_node._process_follower()
