@@ -9,12 +9,14 @@ system
 import socket
 import threading
 import socketserver
+import logging
 
 from raft.LoggingHelper import get_logger
 from raft.message import MessageTranslator, MessageQueue
 from raft.network import NetworkUtil
 
 LOG = get_logger(__name__)
+LOG.setLevel(logging.ERROR)
 
 class NetworkComm:
 
@@ -40,6 +42,7 @@ class NetworkComm:
   def _run_server(self):
     LOG.info("Starting server thread")
     thread = threading.Thread(target=self._process_server_thread)
+    thread.daemon = True
     thread.start()
 
   def _process_server_thread(self):
@@ -66,6 +69,7 @@ class NetworkComm:
   def _run_senders(self):
     LOG.info("Starting senders thread")
     self._sending_thread = threading.Thread(target=self._process_senders_thread)
+    self._sending_thread.daemon = True
     self._sending_thread.start()
 
   def _process_senders_thread(self):
@@ -83,6 +87,7 @@ class NetworkComm:
       msg = MessageQueue.send_dequeue()
       data = MessageTranslator.message_to_json(msg)
       if data is not None:
+        LOG.info("Sending data {}".format(data))
         self._send_data(data)
 
   def _send_data(self, data):
@@ -96,9 +101,9 @@ class NetworkComm:
           s.connect((node.get_host(), node.get_port()))
           s.sendall(bytes(data + "\n", "utf-8"))
         except ConnectionRefusedError as e:
-          LOG.error("Failed to connect to {}:{} and send data: {}".format(node.get_host(), node.get_port(), e))
+          LOG.info("Failed to connect to {}:{} and send data: {}".format(node.get_host(), node.get_port(), e))
         except Exception as e:
-          LOG.error("Failed to send data for unknown reason: {}".format(e))
+          LOG.info("Failed to send data for unknown reason: {}".format(e))
 
   def _is_node_me(self, node):
     return NetworkUtil.is_ippaddr_localhost(node.get_host()) and node.get_port() == self._port

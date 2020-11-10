@@ -15,9 +15,16 @@ class Message:
     self._data = data
 
   def __eq__(self, other):
+    if other is None:
+      return False
     return self._sender == other.get_sender() and \
             self._type == other.get_type() and \
             self._data == other.get_data()
+
+  def __str__(self):
+    return "{}, {}, {}".format(self._sender,
+                               self._type,
+                               self._data)
 
   def get_sender(self):
     return self._sender

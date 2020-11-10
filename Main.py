@@ -1,12 +1,16 @@
 import configparser
-import pathlib
+import sys
+import os
+from pathlib import Path
 from raft.NodeMetadata import NodeMetadata
+from raft.network.NetworkComm import NetworkComm
+from raft.Node import Node
 
+config_file = Path(sys.argv[1])
 
 def _read_config():
-  current_dir = pathlib.Path(__file__).parent.absolute()
   config = configparser.ConfigParser()
-  config.read(current_dir / "raft.conf")
+  config.read(config_file)
   nodes = []
   for key in list(config['nodes'].keys()):
     curr_node = config['nodes'][key]
@@ -19,6 +23,11 @@ def _read_config():
 
 def main():
   nodes, port = _read_config()
+  network_comm = NetworkComm(nodes, port, 0.25)
+  node = Node(nodes, port)
+  network_comm.run()
+
+  node.run()
 
 if __name__ == '__main__':
   main()

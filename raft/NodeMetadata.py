@@ -10,6 +10,8 @@ class NodeMetadata:
     self._port = port
 
   def __eq__(self, other):
+    if other is None:
+      return False
     return NetworkUtil.are_ipaddrs_equal(self._host, other.get_host()) and self._port == other.get_port()
 
   def get_host(self):
@@ -17,3 +19,6 @@ class NodeMetadata:
 
   def get_port(self):
     return self._port
+
+  def __str__(self):
+    return "{}:{}".format(self._host, self._port)
