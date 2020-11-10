@@ -6,6 +6,7 @@ Node is the top layer level in the system
 from enum import Enum
 import random
 import time
+from typing import List
 
 from raft.NodeMetadata import NodeMetadata
 from raft.message import MessageQueue
@@ -16,13 +17,13 @@ from raft.network import NetworkUtil
 LOG = get_logger(__name__)
 
 class NodeState(Enum):
-  FOLLOWER = 1
-  CANDIDATE = 2
-  LEADER = 3
+  FOLLOWER = "follower"
+  CANDIDATE = "candidate"
+  LEADER = "leader"
 
 class Node:
 
-  def __init__(self, nodes_list, port):
+  def __init__(self, nodes_list: List, port: int):
     self._state = NodeState.FOLLOWER
     self._election_timeout = None
     self._current_term = 0
@@ -33,10 +34,8 @@ class Node:
     self._port = port
     self._ip_address = NetworkUtil.get_localhost_ip_addr()
 
-  def run(self):
-    """run this node's raft algorithm forever"""
-    while True:
-      self._process_node()
+  def get_state(self):
+    return self._state
 
   def _process_node(self):
     if self._state == NodeState.FOLLOWER:
