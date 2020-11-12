@@ -1,5 +1,5 @@
 from enum import Enum
-
+from raft.NodeMetadata import NodeMetadata
 
 class MessageType(Enum):
   HEARTBEAT = "heartbeat"
@@ -9,7 +9,7 @@ class MessageType(Enum):
 class Message:
   """Usable container for a raft message"""
 
-  def __init__(self, sender, msg_type, data=None):
+  def __init__(self, sender: NodeMetadata, msg_type: MessageType, data: str = None):
     self._sender = sender
     self._type = msg_type
     self._data = data
@@ -26,13 +26,13 @@ class Message:
                                self._type,
                                self._data)
 
-  def get_sender(self):
+  def get_sender(self) -> NodeMetadata:
     return self._sender
 
-  def get_type(self):
+  def get_type(self) -> MessageType:
     return self._type
 
-  def get_data(self):
+  def get_data(self) -> str:
     return self._data
 
 

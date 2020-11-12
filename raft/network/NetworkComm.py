@@ -10,24 +10,26 @@ import socket
 import threading
 import socketserver
 import logging
+from typing import Optional
 
 from raft.LoggingHelper import get_logger
 from raft.message import MessageTranslator, MessageQueue
 from raft.network import NetworkUtil
+from raft.NodeMetadata import NodeMetadata
 
 LOG = get_logger(__name__)
 LOG.setLevel(logging.ERROR)
 
 class NetworkComm:
 
-  def __init__(self, nodes, port, send_timeout=None):
-    self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self._nodes = nodes
-    self._port = port
-    self._server = None
-    self._stop_sending = False
-    self._sending_thread = None
-    self._send_timeout = send_timeout
+  def __init__(self, nodes: list, port: int, send_timeout: float = None):
+    self._socket: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self._nodes: list = nodes
+    self._port: int = port
+    self._server: Optional[socketserver.TCPServer] = None
+    self._stop_sending: bool = False
+    self._sending_thread: Optional[threading.Thread] = None
+    self._send_timeout: float = send_timeout
 
   def run(self):
     """Run the network comm layer - detaches two threads"""
@@ -90,7 +92,7 @@ class NetworkComm:
         LOG.info("Sending data {}".format(data))
         self._send_data(data)
 
-  def _send_data(self, data):
+  def _send_data(self, data: str):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
       if self._send_timeout is not None:
         s.settimeout(self._send_timeout)
@@ -105,5 +107,5 @@ class NetworkComm:
         except Exception as e:
           LOG.info("Failed to send data for unknown reason: {}".format(e))
 
-  def _is_node_me(self, node):
+  def _is_node_me(self, node: NodeMetadata):
     return NetworkUtil.is_ippaddr_localhost(node.get_host()) and node.get_port() == self._port

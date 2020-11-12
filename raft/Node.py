@@ -6,6 +6,7 @@ Node is the top layer level in the system
 from enum import Enum
 import random
 import time
+from typing import Optional
 
 from raft.NodeMetadata import NodeMetadata
 from raft.message import MessageQueue
@@ -22,16 +23,16 @@ class NodeState(Enum):
 
 class Node:
 
-  def __init__(self, nodes_list, port):
-    self._state = NodeState.FOLLOWER
-    self._election_timeout = None
-    self._current_term = 0
-    self._current_leader = None
-    self._nodes = nodes_list
-    self._cluster_size = len(nodes_list)
-    self._votes_needed = self._cluster_size // 2 + 1
-    self._port = port
-    self._ip_address = NetworkUtil.get_localhost_ip_addr()
+  def __init__(self, nodes_list: list, port: int):
+    self._state: NodeState = NodeState.FOLLOWER
+    self._election_timeout: Optional[int] = None
+    self._current_term: int = 0
+    self._current_leader: Optional[NodeMetadata] = None
+    self._nodes: list = nodes_list
+    self._cluster_size: int = len(nodes_list)
+    self._votes_needed: int = self._cluster_size // 2 + 1
+    self._port: int = port
+    self._ip_address: str = NetworkUtil.get_localhost_ip_addr()
 
   def run(self):
     """run this node's raft algorithm forever"""
@@ -48,7 +49,7 @@ class Node:
 
   def _process_follower(self):
     LOG.info("Node entering FOLLOWER state")
-    self._election_timeout = random.randint(500, 1001)
+    self._election_timeout = self._generate_timeout()
     LOG.info("Election timeout generated: {}ms".format(self._election_timeout))
 
     start = time.time()
@@ -81,7 +82,7 @@ class Node:
     message = Message(sender, MessageType.VOTE_REQUEST)
     MessageQueue.send_enqueue(message)
 
-    candidate_timeout = random.randint(500, 1001)
+    candidate_timeout = self._generate_timeout()
     LOG.info("Candidate timeout: {}".format(candidate_timeout))
     start = time.time()
     while self._not_timed_out(start, candidate_timeout):
@@ -115,9 +116,13 @@ class Node:
       MessageQueue.send_enqueue(message)
       time.sleep(0.03)
 
-  def _get_node_metadata(self):
+  def _get_node_metadata(self) -> NodeMetadata:
     return NodeMetadata(self._ip_address, self._port)
 
-  def _not_timed_out(self, start, timeout):
+  def _not_timed_out(self, start: float, timeout: int) -> bool:
     return (time.time() - start) * 1000 < timeout
+
+  def _generate_timeout(self) -> int:
+    #return random.randint(5000, 6000)
+    return random.randint(500, 1001)
 

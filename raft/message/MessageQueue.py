@@ -6,8 +6,8 @@ and the network comm modules
 
 from queue import Queue
 
-_recv_queue = Queue()
-_send_queue = Queue()
+_recv_queue: Queue = Queue()
+_send_queue: Queue = Queue()
 
 def recv_enqueue(item):
   _recv_queue.put(item)

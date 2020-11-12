@@ -6,20 +6,26 @@ and Message objects
 
 
 import json
+from typing import Optional
+
 from raft.NodeMetadata import NodeMetadata
 from raft.message.Message import Message, MessageType
+from raft.LoggingHelper import get_logger
 
 MSG_TYPE_KEY = "type"
 SENDER_HOST_KEY = "senderHost"
 SENDER_PORT_KEY = "senderPort"
 DATA_KEY = "data"
 
-def json_to_message(data):
+LOG = get_logger(__name__)
+
+def json_to_message(data: str) -> Optional[Message]:
   """Translate a JSON message from the network
   into a usable Message object"""
 
   if not _validate_data(data):
     return None
+  LOG.error(data)
   data_dict = json.loads(data)
   msg_type = data_dict.get(MSG_TYPE_KEY, None)
   if msg_type is None:
@@ -47,7 +53,7 @@ def _validate_data(data):
     return False
   return True
 
-def message_to_json(message):
+def message_to_json(message: Message) -> Optional[str]:
   """Serialize a message object into a JSON string"""
 
   if not isinstance(message, Message):

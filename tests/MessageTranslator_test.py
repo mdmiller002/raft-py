@@ -4,7 +4,7 @@ import json
 import pytest
 
 @pytest.mark.parametrize("msg_type", ["heartbeat", "voteRequest", "voteResponse"])
-def test_json_to_msg_success(msg_type):
+def test_json_to_msg_success(msg_type: str):
   json_obj = {
     "type": msg_type,
     "senderHost": "localhost",
@@ -52,13 +52,13 @@ def test_json_to_msg_success_no_data():
   "data": "abcde"
 }
 ])
-def test_json_to_msg_missing_data(json_obj):
+def test_json_to_msg_missing_data(json_obj: dict):
   json_str = json.dumps(json_obj)
   msg = json_to_message(json_str)
   assert msg is None
 
 @pytest.mark.parametrize("msg_type", [MessageType.HEARTBEAT, MessageType.VOTE_REQUEST, MessageType.VOTE_RESPONSE])
-def test_msg_to_json_success(msg_type):
+def test_msg_to_json_success(msg_type: MessageType):
   sender = NodeMetadata("localhost", 12345)
   message = Message(sender, msg_type, "abc")
   msg_json = message_to_json(message)
@@ -66,7 +66,7 @@ def test_msg_to_json_success(msg_type):
   assert msg_json == "{\"type\": \"" + type_str + "\", \"senderHost\": \"localhost\", \"senderPort\": 12345, \"data\": \"abc\"}"
 
 @pytest.mark.parametrize("msg_type", [MessageType.HEARTBEAT, MessageType.VOTE_REQUEST, MessageType.VOTE_RESPONSE])
-def test_msg_to_json_success_no_data(msg_type):
+def test_msg_to_json_success_no_data(msg_type: MessageType):
   sender = NodeMetadata("localhost", 12345)
   message = Message(sender, msg_type)
   msg_json = message_to_json(message)
