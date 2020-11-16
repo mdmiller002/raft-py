@@ -25,7 +25,6 @@ def json_to_message(data: str) -> Optional[Message]:
 
   if not _validate_data(data):
     return None
-  LOG.error(data)
   data_dict = json.loads(data)
   msg_type = data_dict.get(MSG_TYPE_KEY, None)
   if msg_type is None:
