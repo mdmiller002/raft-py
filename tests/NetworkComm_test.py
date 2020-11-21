@@ -18,6 +18,7 @@ def nodes():
 def json_msg():
   return json.dumps({
     "type": "heartbeat",
+    "electionTerm": 1,
     "senderHost": "localhost",
     "senderPort": 12345,
     "data": "abcde"

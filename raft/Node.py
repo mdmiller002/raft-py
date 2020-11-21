@@ -24,7 +24,7 @@ class NodeState(Enum):
 
 class Node:
 
-  SLEEP_TIME = 1
+  SLEEP_TIME = 1 #0.1
 
   def __init__(self, nodes_list: list, port: int, network_comm: NetworkComm):
     self._state: NodeState = NodeState.FOLLOWER
@@ -60,7 +60,7 @@ class Node:
     # TODO next when a failover has happened, we don't switch leaders.
     # Use terms to implement this (i.e. if the heartbeat has a higher
     # term number, take them as the new leader
-    LOG.info("Node entering FOLLOWER state")
+    LOG.info("Node entering FOLLOWER state with term {}".format(self._current_term))
     self._election_timeout = self._generate_timeout()
     LOG.info("Election timeout generated: {}ms".format(self._election_timeout))
 
@@ -69,34 +69,50 @@ class Node:
       time.sleep(Node.SLEEP_TIME)
       if not MessageQueue.recv_empty():
         msg = MessageQueue.recv_dequeue()
-        LOG.info("Received a message: {}, {}".format(msg.get_sender(), msg.get_type()))
+        LOG.info("Received a message: {}, {}, term: {}".format(msg.get_sender(), msg.get_type(), msg.get_election_term()))
+
+        # Joining the cluster when a leader has already been established
         if self._current_leader is None and msg.get_type() == MessageType.HEARTBEAT:
           LOG.info("Received a heartbeat from the new leader {}".format(msg.get_sender()))
           self._current_leader = msg.get_sender()
+          self._current_term = msg.get_election_term()
           return
+
+        # Heartbeat from current leader
         if msg.get_sender() == self._current_leader and msg.get_type() == MessageType.HEARTBEAT:
           LOG.info("Received heartbeat from leader, remaining in follower state")
           return
-        if msg.get_sender() != self._current_leader and msg.get_type() == MessageType.HEARTBEAT:
+
+        # Have a leader, but a new leader with a higher term has been elected
+        if msg.get_sender() != self._current_leader and msg.get_type() == MessageType.HEARTBEAT \
+                and msg.get_election_term() > self._current_term:
           LOG.info("Received a heartbeat from the new leader {}".format(msg.get_sender()))
           self._current_leader = msg.get_sender()
+          self._current_term = msg.get_election_term()
           return
-        if msg.get_sender() != self._current_leader and msg.get_type() == MessageType.VOTE_REQUEST:
+
+        # Vote request
+        if msg.get_sender() != self._current_leader and msg.get_type() == MessageType.VOTE_REQUEST \
+                and msg.get_election_term() > self._current_term:
           LOG.info("Received vote request from {}, sending vote response".format(msg.get_sender()))
           sender = self._get_node_metadata()
-          message = Message(sender, MessageType.VOTE_RESPONSE)
+          message = Message(sender, MessageType.VOTE_RESPONSE, self._current_term)
           LOG.info("Sending vote response: {}".format(message))
           self._network_comm.send_data(message, msg.get_sender())
+
     LOG.info("Election timeout reached, entering candidate state")
     self._state = NodeState.CANDIDATE
 
+  def _send_heartbeat_response(self):
+    message = Message(self._get_node_metadata(), MessageType.HEARTBEAT_RESPONSE, self._current_term)
+    self._network_comm.send_data(message, self._current_leader)
+
   def _process_candidate(self):
-    LOG.info("Node entering CANDIDATE STATE")
     # TODO handle election terms
     self._current_term += 1
+    LOG.info("Node entering CANDIDATE STATE with term {}".format(self._current_term))
     sender = self._get_node_metadata()
-    message = Message(sender, MessageType.VOTE_REQUEST)
-    MessageQueue.send_enqueue(message)
+    message = Message(sender, MessageType.VOTE_REQUEST, self._current_term)
     for neighbor in self._neighbors:
       self._network_comm.send_data(message, neighbor)
 
@@ -125,13 +141,14 @@ class Node:
     if self._state == NodeState.CANDIDATE:
       LOG.info("Failed to get votes, falling back to follower state")
       self._state = NodeState.FOLLOWER
+      self._current_term -= 1
 
 
   def _process_leader(self):
     LOG.info("Node entering LEADER state")
     while True:
       sender = self._get_node_metadata()
-      message = Message(sender, MessageType.HEARTBEAT)
+      message = Message(sender, MessageType.HEARTBEAT, self._current_term)
       for neighbor in self._neighbors:
         self._network_comm.send_data(message, neighbor)
       time.sleep(Node.SLEEP_TIME)
