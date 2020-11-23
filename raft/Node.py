@@ -24,7 +24,10 @@ class NodeState(Enum):
 
 class Node:
 
-  SLEEP_TIME = 1 #0.1
+  # These parameters can be used to tune the speed of the raft algorithm
+  SLEEP_TIME_SECS = 0.5
+  TIMEOUT_MIN_MSECS = int(1.5 * 1000)
+  TIMEOUT_MAX_MSECS = int(3.1 * 1000)
 
   def __init__(self, nodes_list: list, port: int, network_comm: NetworkComm):
     self._state: NodeState = NodeState.FOLLOWER
@@ -57,16 +60,13 @@ class Node:
       self._process_leader()
 
   def _process_follower(self):
-    # TODO next when a failover has happened, we don't switch leaders.
-    # Use terms to implement this (i.e. if the heartbeat has a higher
-    # term number, take them as the new leader
     LOG.info("Node entering FOLLOWER state with term {}".format(self._current_term))
     self._election_timeout = self._generate_timeout()
     LOG.info("Election timeout generated: {}ms".format(self._election_timeout))
 
+    voted_this_term = False
     start = time.time()
     while self._not_timed_out(start, self._election_timeout):
-      time.sleep(Node.SLEEP_TIME)
       if not MessageQueue.recv_empty():
         msg = MessageQueue.recv_dequeue()
         LOG.info("Received a message: {}, {}, term: {}".format(msg.get_sender(), msg.get_type(), msg.get_election_term()))
@@ -93,12 +93,13 @@ class Node:
 
         # Vote request
         if msg.get_sender() != self._current_leader and msg.get_type() == MessageType.VOTE_REQUEST \
-                and msg.get_election_term() > self._current_term:
+                and msg.get_election_term() > self._current_term and not voted_this_term:
           LOG.info("Received vote request from {}, sending vote response".format(msg.get_sender()))
           sender = self._get_node_metadata()
           message = Message(sender, MessageType.VOTE_RESPONSE, self._current_term)
           LOG.info("Sending vote response: {}".format(message))
           self._network_comm.send_data(message, msg.get_sender())
+          voted_this_term = True
 
     LOG.info("Election timeout reached, entering candidate state")
     self._state = NodeState.CANDIDATE
@@ -108,7 +109,6 @@ class Node:
     self._network_comm.send_data(message, self._current_leader)
 
   def _process_candidate(self):
-    # TODO handle election terms
     self._current_term += 1
     LOG.info("Node entering CANDIDATE STATE with term {}".format(self._current_term))
     sender = self._get_node_metadata()
@@ -151,7 +151,7 @@ class Node:
       message = Message(sender, MessageType.HEARTBEAT, self._current_term)
       for neighbor in self._neighbors:
         self._network_comm.send_data(message, neighbor)
-      time.sleep(Node.SLEEP_TIME)
+      time.sleep(Node.SLEEP_TIME_SECS)
 
   def _get_node_metadata(self) -> NodeMetadata:
     return NodeMetadata(self._ip_address, self._port)
@@ -160,6 +160,5 @@ class Node:
     return (time.time() - start) * 1000 < timeout
 
   def _generate_timeout(self) -> int:
-    return random.randint(5000, 6000)
-    #return random.randint(500, 1001)
+    return random.randint(Node.TIMEOUT_MIN_MSECS, Node.TIMEOUT_MAX_MSECS)
 
