@@ -66,9 +66,11 @@ class Node:
 
     voted_this_term = False
     start = time.time()
-    while self._not_timed_out(start, self._election_timeout):
+    while not self._timed_out(start, self._election_timeout):
       if not MessageQueue.recv_empty():
         msg = MessageQueue.recv_dequeue()
+        if not self._validate_message_sender(msg):
+          continue
         LOG.info("Received a message: {}, {}, term: {}".format(msg.get_sender(), msg.get_type(), msg.get_election_term()))
 
         # Joining the cluster when a leader has already been established
@@ -76,11 +78,13 @@ class Node:
           LOG.info("Received a heartbeat from the new leader {}".format(msg.get_sender()))
           self._current_leader = msg.get_sender()
           self._current_term = msg.get_election_term()
+          self._send_heartbeat_response()
           return
 
         # Heartbeat from current leader
         if msg.get_sender() == self._current_leader and msg.get_type() == MessageType.HEARTBEAT:
           LOG.info("Received heartbeat from leader, remaining in follower state")
+          self._send_heartbeat_response()
           return
 
         # Have a leader, but a new leader with a higher term has been elected
@@ -89,6 +93,7 @@ class Node:
           LOG.info("Received a heartbeat from the new leader {}".format(msg.get_sender()))
           self._current_leader = msg.get_sender()
           self._current_term = msg.get_election_term()
+          self._send_heartbeat_response()
           return
 
         # Vote request
@@ -119,17 +124,15 @@ class Node:
     candidate_timeout = self._generate_timeout()
     LOG.info("Candidate timeout: {}".format(candidate_timeout))
     start = time.time()
-    while self._not_timed_out(start, candidate_timeout):
-      while MessageQueue.recv_empty() and self._not_timed_out(start, candidate_timeout):
+    voted_for_me = []
+    while not self._timed_out(start, candidate_timeout):
+      while MessageQueue.recv_empty() and not self._timed_out(start, candidate_timeout):
         pass
-      if not self._not_timed_out(start, candidate_timeout):
+      if self._timed_out(start, candidate_timeout):
         break
       msg = MessageQueue.recv_dequeue()
-      if msg.get_sender() not in self._nodes:
-        LOG.info("Received message from {}:{}, not in nodes list".format(
-          msg.get_sender().get_host(), msg.get_sender().get_port()))
+      if not self._validate_message_sender(msg):
         continue
-      voted_for_me = []
       if msg.get_type() == MessageType.VOTE_RESPONSE and msg.get_sender not in voted_for_me:
         LOG.info("Got vote from {}".format(msg.get_sender()))
         voted_for_me.append(msg.get_sender())
@@ -146,18 +149,53 @@ class Node:
 
   def _process_leader(self):
     LOG.info("Node entering LEADER state")
-    while True:
-      sender = self._get_node_metadata()
-      message = Message(sender, MessageType.HEARTBEAT, self._current_term)
-      for neighbor in self._neighbors:
-        self._network_comm.send_data(message, neighbor)
-      time.sleep(Node.SLEEP_TIME_SECS)
+    sender = self._get_node_metadata()
+    message = Message(sender, MessageType.HEARTBEAT, self._current_term)
+    for neighbor in self._neighbors:
+      self._network_comm.send_data(message, neighbor)
+
+    leader_timeout = self._generate_timeout()
+    start = time.time()
+    heartbeat_responses = []
+
+    # TODO fix this so we don't timeout but remain as leader until there is another leader with a higher term
+    while not self._timed_out(start, leader_timeout):
+      while MessageQueue.recv_empty() and not self._timed_out(start, leader_timeout):
+        pass
+      if self._timed_out(start, leader_timeout):
+        self._state = NodeState.FOLLOWER
+        break
+      msg = MessageQueue.recv_dequeue()
+      LOG.info("Received a message: {}, {}, term: {}".format(msg.get_sender(), msg.get_type(), msg.get_election_term()))
+      if not self._validate_message_sender(msg):
+        continue
+
+      if msg.get_type() == MessageType.HEARTBEAT_RESPONSE and msg.get_sender() not in heartbeat_responses:
+        heartbeat_responses.append(msg.get_sender())
+
+      if msg.get_type() == MessageType.HEARTBEAT_RESPONSE and msg.get_election_term() > self._current_term:
+        LOG.info("Received a heartbeat from a leader with a higher term")
+
+      # As soon as we get a majority ack, return
+      if len(heartbeat_responses) + 1 >= self._votes_needed:
+        return
+
+    if self._state == NodeState.FOLLOWER:
+      LOG.info("Failed to get majority ack in allotted time, stepping down")
+      self._current_leader = None
+
+  def _validate_message_sender(self, msg: Message) -> bool:
+    if msg.get_sender() not in self._neighbors:
+      LOG.info("Received message from {}:{}, not in neighbors".format(
+        msg.get_sender().get_host(), msg.get_sender().get_port()))
+      return False
+    return True
 
   def _get_node_metadata(self) -> NodeMetadata:
     return NodeMetadata(self._ip_address, self._port)
 
-  def _not_timed_out(self, start: float, timeout: int) -> bool:
-    return (time.time() - start) * 1000 < timeout
+  def _timed_out(self, start: float, timeout: int) -> bool:
+    return (time.time() - start) * 1000 > timeout
 
   def _generate_timeout(self) -> int:
     return random.randint(Node.TIMEOUT_MIN_MSECS, Node.TIMEOUT_MAX_MSECS)
