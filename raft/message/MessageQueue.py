@@ -6,30 +6,19 @@ and the network comm modules
 
 from queue import Queue
 
-_recv_queue = Queue()
-_send_queue = Queue()
+from raft.message.Message import Message
+
+_recv_queue: Queue = Queue()
 
 def recv_enqueue(item):
   _recv_queue.put(item)
 
-def recv_dequeue():
+def recv_dequeue() -> Message:
   return _recv_queue.get()
 
-def recv_empty():
+def recv_empty() -> bool:
   return _recv_queue.empty()
 
-def recv_qsize():
+def recv_qsize() -> int:
   return _recv_queue.qsize()
-
-def send_enqueue(item):
-  _send_queue.put(item)
-
-def send_dequeue():
-  return _send_queue.get()
-
-def send_empty():
-  return _send_queue.empty()
-
-def send_qsize():
-  return _send_queue.qsize()
 

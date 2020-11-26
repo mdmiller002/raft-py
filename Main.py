@@ -24,8 +24,8 @@ def _read_config():
 def main():
   nodes, port = _read_config()
   network_comm = NetworkComm(nodes, port, 0.25)
-  node = Node(nodes, port)
   network_comm.run()
+  node = Node(nodes, port, network_comm)
 
   node.run()
 

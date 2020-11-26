@@ -1,6 +1,6 @@
 import logging
 
-def get_logger(module_name):
+def get_logger(module_name: str) -> logging.Logger:
   formatter = logging.Formatter(fmt="%(asctime)s [%(levelname)s] %(module)s - %(message)s")
   handler = logging.StreamHandler()
   handler.setFormatter(formatter)

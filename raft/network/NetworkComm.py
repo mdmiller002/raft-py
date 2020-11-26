@@ -10,29 +10,32 @@ import socket
 import threading
 import socketserver
 import logging
+from typing import Optional
 
 from raft.LoggingHelper import get_logger
-from raft.message import MessageTranslator, MessageQueue
+from raft.message import MessageTranslator, MessageQueue, Message
 from raft.network import NetworkUtil
+from raft.NodeMetadata import NodeMetadata
 
 LOG = get_logger(__name__)
 LOG.setLevel(logging.ERROR)
 
 class NetworkComm:
 
-  def __init__(self, nodes, port, send_timeout=None):
-    self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self._nodes = nodes
-    self._port = port
-    self._server = None
-    self._stop_sending = False
-    self._sending_thread = None
-    self._send_timeout = send_timeout
+  def __init__(self, nodes: list, port: int, send_timeout: float = None):
+    self._socket: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self._nodes: list = nodes
+    self._port: int = port
+    self._server: Optional[socketserver.TCPServer] = None
+    self._stop_sending: bool = False
+    self._sending_thread: Optional[threading.Thread] = None
+    self._send_timeout: float = send_timeout
 
   def run(self):
     """Run the network comm layer - detaches two threads"""
+    LOG.info("Starting TCP server")
     self._run_server()
-    self._run_senders()
+    #self._run_senders()
 
   def stop(self):
     """Completely shut down and kill the network comm layer"""
@@ -90,12 +93,12 @@ class NetworkComm:
         LOG.info("Sending data {}".format(data))
         self._send_data(data)
 
-  def _send_data(self, data):
+  def _send_data(self, data: str):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
       if self._send_timeout is not None:
         s.settimeout(self._send_timeout)
       for node in self._nodes:
-        if self._is_node_me(node):
+        if self.is_node_me(node):
           continue
         try:
           s.connect((node.get_host(), node.get_port()))
@@ -105,5 +108,22 @@ class NetworkComm:
         except Exception as e:
           LOG.info("Failed to send data for unknown reason: {}".format(e))
 
-  def _is_node_me(self, node):
+  def is_node_me(self, node: NodeMetadata):
     return NetworkUtil.is_ippaddr_localhost(node.get_host()) and node.get_port() == self._port
+
+  def send_data(self, data: Message, recipient: NodeMetadata):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+      if self._send_timeout is not None:
+        s.settimeout(self._send_timeout)
+      if self.is_node_me(recipient):
+        raise ValueError("Cannot send data to myself!")
+      try:
+        s.connect((recipient.get_host(), recipient.get_port()))
+        msg_data = MessageTranslator.message_to_json(data)
+        s.sendall(bytes(msg_data + "\n", "utf-8"))
+      except ConnectionRefusedError as e:
+        LOG.info("Failed to connect to {}:{} and send data: {}".format(
+          recipient.get_host(), recipient.get_port(), e))
+      except Exception as e:
+        LOG.info("Failed to send data for unknown reason: {}".format(e))
+
