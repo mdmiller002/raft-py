@@ -44,12 +44,15 @@ class Node:
 
   def run(self):
     """run this node's raft algorithm forever"""
-    for node in self._nodes:
-      if not self._network_comm.is_node_me(node):
-        self._neighbors.append(node)
+    self._populate_neighbors()
     LOG.info("Neighbors: {}".format(self._neighbors))
     while True:
       self._process_node()
+
+  def _populate_neighbors(self):
+    for node in self._nodes:
+      if not self._network_comm.is_node_me(node):
+        self._neighbors.append(node)
 
   def _process_node(self):
     if self._state == NodeState.FOLLOWER:
