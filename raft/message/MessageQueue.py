@@ -22,3 +22,7 @@ def recv_empty() -> bool:
 def recv_qsize() -> int:
   return _recv_queue.qsize()
 
+def _recv_clear():
+  with _recv_queue.mutex:
+    _recv_queue.queue.clear()
+
