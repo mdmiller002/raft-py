@@ -7,7 +7,7 @@ A Python 3 implementaiton of the Raft consensus algorithm
 ## What is Raft
 Raft is a distributed consensus algorithm that ensures fault tolerance
 and consistency, while maintaining understandability. There are many
-resources on Raft, e.g.: raft.github.io
+resources on Raft, e.g.: [raft.github.io](https://raft.github.io/)
 
 ### The algorithm
 In short, a node can be one of three states:
