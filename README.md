@@ -9,7 +9,7 @@ Raft is a distributed consensus algorithm that ensures fault tolerance
 and consistency, while maintaining understandability. There are many
 resources on Raft, e.g.: [raft.github.io](https://raft.github.io/)
 
-### The algorithm
+### The consensus algorithm
 In short, a node can be one of three states:
 1. Follower
 2. Candidate
@@ -36,4 +36,4 @@ maintaining consistency in the event of network partitions.
 
 ### A note on logs
 Logs are used in raft to distribute state changes throughout the cluster.
-This implementation currently does not use any logs yet.
+This implementation currently does implement the log portion of the algorithm.
